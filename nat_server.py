@@ -17,15 +17,26 @@ def createHttpProxySocket(ip, port):
     return server_socket
 
 
-def handle_create_proxy_request(data: bytes):
-    # example: 'http;8811'
-    proxy_type, remote_port = data.decode().split(";")
+def handle_register_request(data: bytes):
+    # example: 'register;http;8811'
+    message = data.decode()
+    if not message:
+        raise Exception("handle_register_request err: no data")
+
+    flag_filed, proxy_type, remote_port = message.split(";")
     if proxy_type == "http":
-        port = remote_port
+        port = int(remote_port)
         proxy_server = createHttpProxySocket(ip="127.0.0.1", port=port)
         return proxy_type, remote_port, proxy_server
     else:
         raise Exception("unvalid proxy_type : {}".format(proxy_type))
+
+
+def handle_http_request(req_port, req_data):
+    s = proxy_port_map[req_port]["channel_socket"]
+    s.sendall(req_data)
+    res = s.recv(1024)
+    return res
 
 
 def handle_request(client_socket):
@@ -34,26 +45,54 @@ def handle_request(client_socket):
         print("client socket close, {}".format(client_socket))
         client_socket.close()
 
-    # 解析HTTP请求头
-    headers = request_data.decode().split("\r\n")
-    if headers:
-        request_line = headers[0]
-        method, path, protocol = request_line.split(" ")
-        print(method, path, protocol)
+    try:
+        # 解析HTTP请求头
+        # HTTP/1.1 200 OK
+        # Server: nginx
+        # Content-Type: text/html
+        # Content-Length: 12
+        request_lines = request_data.decode().split("\r\n")
+        request_line = request_lines[0]
+        if "HTTP" in request_line:
+            # [
+            #     "GET / HTTP/1.1",
+            #     "Host: 127.0.0.1:8812",
+            #     "Connection: keep-alive",
+            #     "Cache-Control: max-age=0",
+            # ]
+            print("handle http request. {}".format(request_lines))
+            header = request_lines[0]
+            host_info = request_lines[1]
 
-    else:
-        proxy_type, remote_port, proxy_server = handle_create_proxy_request(
-            request_data
-        )
-        proxy_port_map[remote_port] = {
-            "remote_port": remote_port,
-            "proxy_type": proxy_type,
-            "proxy_server": proxy_server,
-            "channel_socket": client_socket,
-        }
-        proxy_socket_list.append(client_socket)
+            method, path, protocol = header.split(" ")
+            print(method, path, protocol)
+            request_port = host_info.split(":")[-1]
+            res = handle_http_request(request_port, request_data)
+            client_socket.sendall(res)
 
-    # client_socket.close()
+        elif "register" in request_line:
+            print("handle register request. {}".format(request_lines))
+            proxy_type, remote_port, proxy_server = handle_register_request(
+                request_data
+            )
+            proxy_port_map[remote_port] = {
+                "remote_port": remote_port,
+                "proxy_type": proxy_type,
+                "proxy_server": proxy_server,
+                "channel_socket": client_socket,
+            }
+            server_socket_list.append(proxy_server)
+            proxy_socket_list.append(client_socket)
+
+            read_socket_list.append(proxy_server)
+            read_socket_list.append(client_socket)
+
+        else:
+            print("unkonown request, close socket. {}".format(request_lines))
+            client_socket.close()
+
+    except Exception as err:
+        print(err)
 
 
 def createNatServerSocket(ip, port):
@@ -68,6 +107,7 @@ def createNatServerSocket(ip, port):
 if __name__ == "__main__":
 
     nat_server = createNatServerSocket(ip="127.0.0.1", port=8080)
+    server_socket_list.append(nat_server)
     read_socket_list.append(nat_server)
 
     while True:
