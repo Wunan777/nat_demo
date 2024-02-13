@@ -1,25 +1,39 @@
-import asyncio
 import socket
-from threading import Thread
-import time
 import select
-from flask import Flask, request
+
+proxy_port_map = {}
+# The `server socket` and `proxy socket` need to be persistent.
+server_socket_list = []
+proxy_socket_list = []
+# The socket which `server socket` created directly or  indirectly, should put into the `read socket` list.
+read_socket_list = []
 
 
-def create_socket_send_and_recv(data):
-    s = socket.socket()  # 创建 socket 对象
-    host = "127.0.0.1"  # 获取本地主机名
-    port = 8113  # 设置端口号
+def createHttpProxySocket(ip, port):
+    print("HttpProxy: '{}:{}', running...".format(ip, port))
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((ip, port))
+    server_socket.listen(5)
+    return server_socket
 
-    s.connect((host, port))
-    # print(s.recv(1024))
-    s.sendall(data)
-    res = s.recv(1024)
-    return res
+
+def handle_create_proxy_request(data: bytes):
+    # example: 'http;8811'
+    proxy_type, remote_port = data.decode().split(";")
+    if proxy_type == "http":
+        port = remote_port
+        proxy_server = createHttpProxySocket(ip="127.0.0.1", port=port)
+        return proxy_type, remote_port, proxy_server
+    else:
+        raise Exception("unvalid proxy_type : {}".format(proxy_type))
 
 
 def handle_request(client_socket):
     request_data = client_socket.recv(1024)
+    if not request_data:
+        print("client socket close, {}".format(client_socket))
+        client_socket.close()
+
     # 解析HTTP请求头
     headers = request_data.decode().split("\r\n")
     if headers:
@@ -27,71 +41,45 @@ def handle_request(client_socket):
         method, path, protocol = request_line.split(" ")
         print(method, path, protocol)
 
-        response = create_socket_send_and_recv(request_data)
-        # 返回HTTP响应
-        # response = (
-        #     "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<h1>Hello, World!</h1>"
-        # )
-        client_socket.sendall(response)
+    else:
+        proxy_type, remote_port, proxy_server = handle_create_proxy_request(
+            request_data
+        )
+        proxy_port_map[remote_port] = {
+            "remote_port": remote_port,
+            "proxy_type": proxy_type,
+            "proxy_server": proxy_server,
+            "channel_socket": client_socket,
+        }
+        proxy_socket_list.append(client_socket)
 
-    client_socket.close()
+    # client_socket.close()
 
 
-def createHttpProxySocket(ip, port):
-    print("HttpProxy: '{}:{}', running...".format(ip, port))
+def createNatServerSocket(ip, port):
+    print("NatServer: '{}:{}', running...".format(ip, port))
     # await run_server(ip, port)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((ip, port))
     server_socket.listen(5)
-
-    # while True:
-    #     print("waiting...")
-    #     client_socket, addr = server_socket.accept()
-    #     print(f"Connection from {addr}")
-    #     handle_request(client_socket)
-
     return server_socket
-
-
-app = Flask(__name__)
-
-
-@app.route("/proxy", methods=["POST"])
-def post_example():
-    # 获取 POST 请求中的数据
-    data = request.form.get("data")
-    return f"POST 请求数据：{data}"
-
-
-def run_flask():
-    app.run(debug=True, port=8080)
 
 
 if __name__ == "__main__":
 
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
-    flask_thread.join()
-    # server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    # server_socket.bind(("", 8811))
-    # server_socket.listen(5)
-    s1 = createHttpProxySocket("127.0.0.1", 8811)
-    s2 = createHttpProxySocket("127.0.0.1", 8822)
-
-    server_list = [s1, s2]
-    # List will be read.
-    read_list = [s1, s2]
+    nat_server = createNatServerSocket(ip="127.0.0.1", port=8080)
+    read_socket_list.append(nat_server)
 
     while True:
-        readable, writable, errored = select.select(read_list, [], [])
+        readable, writable, errored = select.select(read_socket_list, [], [])
 
         for s in readable:
-            if s in server_list:
+            if s in server_socket_list:
                 client_socket, address = s.accept()
-                read_list.append(client_socket)
+                read_socket_list.append(client_socket)
                 print("Connection from: {}".format(address))
             else:
-                # data = s.recv(1024)
                 handle_request(s)
-                read_list.remove(s)
+
+                if s not in proxy_socket_list:
+                    read_socket_list.remove(s)
