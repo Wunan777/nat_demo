@@ -35,12 +35,12 @@ def handle_register_request(data: bytes):
 def handle_http_request(req_port, req_data):
     s = proxy_port_map[req_port]["channel_socket"]
     s.sendall(req_data)
-    res = s.recv(1024)
+    res = s.recv(49152)
     return res
 
 
 def handle_request(client_socket):
-    request_data = client_socket.recv(1024)
+    request_data = client_socket.recv(49152)
     if not request_data:
         print("client socket close, {}".format(client_socket))
         client_socket.close()
@@ -68,6 +68,7 @@ def handle_request(client_socket):
             print(method, path, protocol)
             request_port = host_info.split(":")[-1]
             res = handle_http_request(request_port, request_data)
+            print("recv handle_http_request res: {}".format(res))
             client_socket.sendall(res)
 
         elif "register" in request_line:
@@ -123,3 +124,4 @@ if __name__ == "__main__":
 
                 if s not in proxy_socket_list:
                     read_socket_list.remove(s)
+                    print("temp socket removed, {}".format(s))
