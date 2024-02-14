@@ -13,7 +13,7 @@ Run on device which need NAT traversal.
 ```
 NAT_SERVER="10.10.2.2:8080" python3 nat_client.py --type=http --local_port=8811 --remote_port=8811
 ```
-remote {ip:port}<----> local {ip:port}
+remote {ip:port} <----> local {ip:port}
 
 remote ip: nat server ip, example: 10.10.2.2
 remote port: args remote port

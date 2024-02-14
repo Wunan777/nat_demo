@@ -1,5 +1,7 @@
 import socket
 import select
+import argparse
+
 
 proxy_port_map = {}
 # The `server socket` and `proxy socket` need to be persistent.
@@ -106,8 +108,12 @@ def createNatServerSocket(ip, port):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="NAT Client")
+    parser.add_argument("--port", help="Nat Server Port.", required=True)
+    args = parser.parse_args()
 
-    nat_server = createNatServerSocket(ip="127.0.0.1", port=8080)
+    port = int(args.port)
+    nat_server = createNatServerSocket(ip="127.0.0.1", port=port)
     server_socket_list.append(nat_server)
     read_socket_list.append(nat_server)
 
