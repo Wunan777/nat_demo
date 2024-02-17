@@ -28,7 +28,7 @@ def handle_register_request(data: bytes):
     flag_filed, proxy_type, remote_port = message.split(";")
     if proxy_type == "http":
         port = int(remote_port)
-        proxy_server = createHttpProxySocket(ip="127.0.0.1", port=port)
+        proxy_server = createHttpProxySocket(ip="0.0.0.0", port=port)
         return proxy_type, remote_port, proxy_server
     else:
         raise Exception("unvalid proxy_type : {}".format(proxy_type))
@@ -112,8 +112,10 @@ if __name__ == "__main__":
     parser.add_argument("--port", help="Nat Server Port.", required=True)
     args = parser.parse_args()
 
+    ip = "0.0.0.0"
     port = int(args.port)
-    nat_server = createNatServerSocket(ip="127.0.0.1", port=port)
+
+    nat_server = createNatServerSocket(ip=ip, port=port)
     server_socket_list.append(nat_server)
     read_socket_list.append(nat_server)
 
