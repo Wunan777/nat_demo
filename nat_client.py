@@ -1,7 +1,7 @@
 import os
 import socket
 import argparse
-import time
+from src.const import RECV_MAX_SIZE
 
 
 def create_proxy_socket(host, port):
@@ -62,20 +62,13 @@ def main():
             # client_socket.sendall(message.encode())
 
             # # 接收来自服务器端的响应
-            # response = client_socket.recv(4096)
             # print("收到来自服务器端的响应:", response.decode())
-            r1 = nat_server_socket.recv(4096)
+            r1 = nat_server_socket.recv(RECV_MAX_SIZE)
             proxy_socket = create_proxy_socket(host="127.0.0.1", port=args.local_port)
             proxy_socket.sendall(r1)
-            r2 = proxy_socket.recv(1024)
-            while True:
-                chunk = proxy_socket.recv(1024)
-                if not chunk:
-                    break
-                r2 += chunk
+            r2 = proxy_socket.recv(RECV_MAX_SIZE)
             print("data: {}".format(r2))
             print("Start: send data to nat server...")
-            time.sleep(1)
             nat_server_socket.sendall(r2)
             print("Finished: send data to nat server.")
         except socket.error as err:

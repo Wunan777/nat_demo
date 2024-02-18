@@ -1,0 +1,1 @@
+RECV_MAX_SIZE = 10 * 1024  # 1MB

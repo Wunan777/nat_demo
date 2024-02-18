@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nat_server.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--port=8080",
+            ],
+            "env": {
+            },
+        },
+        {
+            "name": "Debug nat_client.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nat_client.py",
+            "args": [
+                "--type=http",
+                "--local_port=8811",
+                "--remote_port=8812"
+            ],
+            "env": {
+                "NAT_SERVER": "127.0.0.1:8080"
+            },
+            "console": "integratedTerminal"
+        }
+        
+    ]
+}
