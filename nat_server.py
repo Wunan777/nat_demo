@@ -55,6 +55,22 @@ def find_proxy_nat_client(register_port):
         return proxy_nat_client_port_map[register_port]["channel_socket"]
 
 
+def find_request_host(request_data):
+    request_lines = request_data.decode().split("\r\n")
+    request_port = None
+    for request_line in request_lines:
+        if "HOST" in request_line:
+            request_port = request_line.split(":")[-1]
+
+    if not request_port:
+        raise Exception(
+            "according request_data, request_port not found. Detail: {}".format(
+                request_data
+            )
+        )
+    return request_port
+
+
 def handle_http_request_proxy_to_nat_client(req_port, req_data):
     # s = proxy_nat_client_port_map[req_port]["channel_socket"]
     proxy_nat_client_socket = find_proxy_nat_client(req_port)
@@ -82,7 +98,8 @@ def handle_http_request(s, request_data):
 
     method, path, protocol = header.split(" ")
     print(method, path, protocol)
-    request_port = host_info.split(":")[-1]
+
+    request_port = find_request_host(request_data)
     res = handle_http_request_proxy_to_nat_client(request_port, request_data)
     print("recv handle_http_request res: {}".format(res))
     s.sendall(res)
